@@ -29,13 +29,13 @@ import com.baselet.element.OldGridElement;
 // that is sent between two objects.
 class Interaction {
 
-	private int srcObj;
-	private boolean srcObjHasControl;
-	private int arrowKind; // 1=SYNC, 2= ASYNC, 3=EDGE, 4=FILLED
-	private int lineKind; // 1=SOLID, 2=DOTTED
-	private int destObj;
-	private boolean destObjHasControl;
-	private String methodName;
+	private final int srcObj;
+	private final boolean srcObjHasControl;
+	private final int arrowKind; // 1=SYNC, 2= ASYNC, 3=EDGE, 4=FILLED
+	private final int lineKind; // 1=SOLID, 2=DOTTED
+	private final int destObj;
+	private final boolean destObjHasControl;
+	private final String methodName;
 
 	public Interaction(int srcObj, boolean srcObjHasControl, int arrowKind, int lineKind,
 			int destObj, boolean destObjHasControl, String methodName) {
@@ -105,7 +105,7 @@ class Interaction {
 // offers various comfort-functions for finding and
 // working with interactions
 class InteractionManagement {
-	private Set<Interaction>[] level;
+	private final Set<Interaction>[] level;
 
 	// private Set[] level;
 
@@ -277,7 +277,7 @@ public class SequenceDiagram extends OldGridElement {
 			Vector<String> interactions = Utils.decomposeStrings(lines.elementAt(i), ";");
 
 			for (int j = 0; j < interactions.size(); j++) {
-				Pattern p = Pattern.compile("\\A(\\w+)(->>|->|-/>|.>>|.>|./>|->>>|.>>>|<<-|<-|</-|<<.|<.|</.|<<<-|<<<.)(\\w+)(:((\\w+)(,(\\w+))*))?(?::(.*))?\\z");
+				Pattern p = Pattern.compile("\\A[ \\t]*(\\w+)(->>|->|-/>|.>>|.>|./>|->>>|.>>>|<<-|<-|</-|<<.|<.|</.|<<<-|<<<.)(\\w+)(:(([\\+\\-\\w ]\\w*)(,([\\+\\-\\w]\\w*))*))?(?::(.*))?\\z");
 				// Pattern.compile("\\A(\\d+)(->>|->|-/>|.>>|.>|./>|->>>|.>>>)(\\d+)(:((\\d+)(,(\\d+))*))*(?::(.*))?\\z");
 
 				// 1->2:1,2:methodName
@@ -381,9 +381,21 @@ public class SequenceDiagram extends OldGridElement {
 					String[] grouparray = group.split(",");
 					group = "";
 					for (String tmp : grouparray) {
-						Integer tempgroup = labeltonumber.get(tmp);
-						if (tempgroup != null) {
-							group += "," + tempgroup;
+						tmp = tmp.trim();
+						if (tmp.length() > 0) {
+							char sign = tmp.charAt(0);
+							String tempgroup = null;
+							switch (sign) {
+								case '+':
+								case '-':
+									tempgroup = labeltonumber.get(tmp.substring(1)).toString();
+									group += "," + sign + tempgroup;
+									break;
+								default:
+									tempgroup = labeltonumber.get(tmp).toString();
+									group += "," + tempgroup;
+									break;
+							}
 						}
 					}
 					if (group.length() > 0) {
@@ -392,14 +404,17 @@ public class SequenceDiagram extends OldGridElement {
 					else {
 						if (grouparray.length == 1) {
 							group = "#";
-							methodName = grouparray[0];
+							String tmp = grouparray[0].trim();
+							if (tmp.length() == 0) {
+								methodName = tmp;
+							}
 						}
 					}
 				} // STOP LABLING ADD
 				boxStrings += ";" + group; // LME: get alive Objects
 
-				boolean srcObjHasControl = srcObj != null ? group.contains(String.valueOf(srcObj)) : false;
-				boolean destObjHasControl = destObj != null ? group.contains(String.valueOf(destObj)) : false;
+				boolean srcObjHasControl = true;// srcObj != null ? group.contains(String.valueOf(srcObj)) : false;
+				boolean destObjHasControl = true;// destObj != null ? group.contains(String.valueOf(destObj)) : false;
 
 				if (methodName.isEmpty()) {
 					methodName = m.group(9);
@@ -470,9 +485,6 @@ public class SequenceDiagram extends OldGridElement {
 			xpos += rectWidth + rectDistance;
 		}
 
-		// draw the messages
-		int maxTextXpos = drawMessages(g2);
-		maxTextXpos += 3 * Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts(); // add extra space
 		if (boxStrings.length() > 1) {
 			try {
 				drawControlFlowBoxesWithLines(g2, boxStrings.substring(1), numObjects); // LME: 1,2;1,2;... cut first ;-character
@@ -481,6 +493,9 @@ public class SequenceDiagram extends OldGridElement {
 				// that is not rendered to an control flow box
 			}
 		}
+		// draw the messages
+		int maxTextXpos = drawMessages(g2);
+		maxTextXpos += 3 * Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts(); // add extra space
 
 		// set our component to the correct size
 		int rWidth = rectWidth * numObjects + rectDistance * (numObjects - 1) + 2 * borderDistance;
@@ -628,17 +643,22 @@ public class SequenceDiagram extends OldGridElement {
 		// collect all tokens into an array: create another view to sequentially access data of a specific object
 		// 1,2;#;1,3;1,3;1;3 will be transfomed to
 		// tField: [110]
-		// [000]
+		// [110]
 		// [101]
 		// [101]
 		// [100]
 		// [001]
 		while (mainTokens.hasMoreTokens()) {
 			String main = mainTokens.nextToken();
-			if (main.indexOf("#") >= 0) { // if no box, clear entire row
+			if (main.indexOf("#") >= 0) { // if no box, get row from previous level
 				for (int i = 0; i < numObjects; i++)
 				{
-					tField[i][level - 1] = 0; // clear
+					if (level == 1) {
+						tField[i][level - 1] = 0; // clear
+					}
+					else {
+						tField[i][level - 1] = tField[i][level - 2];
+					}
 				}
 				if (main.indexOf("#iframe{") >= 0 || main.indexOf("#iframe}") >= 0) {
 					if (main.indexOf("#iframe{") >= 0) {
@@ -655,14 +675,29 @@ public class SequenceDiagram extends OldGridElement {
 			}
 			else {
 				StringTokenizer innerT = new StringTokenizer(main, ",");
-				for (int i = 0; i < numObjects; i++)
+				boolean modification = main.contains("-") || main.contains("+");
+				if (level == 1 || !modification)
 				{
-					tField[i][level - 1] = 0; // clear
+					for (int i = 0; i < numObjects; i++)
+					{
+						tField[i][level - 1] = 0; // clear
+					}
+				}
+				else {
+					for (int i = 0; i < numObjects; i++)
+					{
+						tField[i][level - 1] = tField[i][level - 2]; // clear
+					}
 				}
 				while (innerT.hasMoreTokens()) {
 					String is = innerT.nextToken();
 					int objNum = Integer.parseInt(is);
-					tField[objNum - 1][level - 1] = 1;
+					if (objNum > 0) {
+						tField[objNum - 1][level - 1] = 1;
+					}
+					else {
+						tField[-objNum - 1][level - 1] = 0;
+					}
 				}
 				level++;
 			} // #else
@@ -690,6 +725,10 @@ public class SequenceDiagram extends OldGridElement {
 				}
 				if (tField[actObjNum][i] == 0 && startLevel != -1) {
 					int y1 = vCenterForLevel(startLevel + offset) - levelHeight - 1;
+					Color oldColor = g2.getColor();
+					g2.setColor(Color.LIGHT_GRAY);
+					g2.fillRect(x1, y1, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
+					g2.setColor(oldColor);
 					g2.drawRect(x1, y1, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
 
 					g2.setStroke(Utils.getStroke(LineType.DASHED, 1)); // #draw the line between the boxes
@@ -746,27 +785,42 @@ public class SequenceDiagram extends OldGridElement {
 	}
 
 	private void drawInteractionFrame(Graphics2D g2, int pos1, int pos2, int recursionLevel, String text) {
+		Color oldColor = g2.getColor();
+		g2.setColor(Color.GRAY);
 
 		float zoom = Main.getHandlerForElement(this).getZoomFactor();
 
 		int pos11 = (pos1 + 1) * levelHeight + yOffsetforTitle;
 		int h = (pos2 - pos1) * levelHeight;
 		int x = (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() * 2 + recursionLevel * 4;
-		g2.drawRect(x, pos11, getRectangle().width - (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() * 4 - 1 - recursionLevel * 8, h);
-		int uLinePos = pos11 + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() + (int) (Main.getHandlerForElement(this).getFontHandler().getFontSize() + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts());
-		int textPos = pos11 + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() + (int) Main.getHandlerForElement(this).getFontHandler().getFontSize();
+		int y3 = pos11;
+		int uLinePos = y3 + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() + (int) (Main.getHandlerForElement(this).getFontHandler().getFontSize() + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts());
+		int textPos = y3 + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() + (int) Main.getHandlerForElement(this).getFontHandler().getFontSize();
 
 		int textWidth = 0;
 		if (text == null || text.equals("")) {
 			text = " ";
 		}
-		g2.drawString(text, x + (int) (10 * zoom), textPos);
+
 		int pW = (int) Main.getHandlerForElement(this).getFontHandler().getTextWidth(text);
 		textWidth = pW > textWidth ? pW : textWidth;
 
-		g2.drawLine(x, uLinePos, x + textWidth + (int) (15 * zoom), uLinePos);
-		g2.drawLine(x + textWidth + (int) (15 * zoom), uLinePos, x + textWidth + (int) (25 * zoom), pos11 + (int) (10 * zoom));
-		g2.drawLine(x + textWidth + (int) (25 * zoom), pos11, x + textWidth + (int) (25 * zoom), pos11 + (int) (10 * zoom));
+		g2.setColor(Color.WHITE);
+		int x1 = x;
+		int x2 = x + textWidth + (int) (15 * zoom);
+		int x3 = x + textWidth + (int) (25 * zoom);
+		int y1 = uLinePos;
+		int y2 = y3 + (int) (10 * zoom);
+		g2.fillPolygon(new int[] { x1, x2, x3, x3, x1 }, new int[] { y1, y1, y2, y3, y3 }, 5);
+		g2.setColor(Color.GRAY);
+		g2.drawRect(x, y3, getRectangle().width - (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() * 4 - 1 - recursionLevel * 8, h);
+		g2.drawLine(x1, y1, x2, y1);
+		g2.drawLine(x2, y1, x3, y2);
+		g2.drawLine(x3, y3, x3, y2);
+
+		g2.setColor(oldColor);
+
+		g2.drawString(text, x + (int) (10 * zoom), textPos);
 	}
 
 	public void drawArrow(Graphics2D g2, Point srcObj, Point destObj, int arrowKind, int lineKind) {
