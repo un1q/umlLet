@@ -459,29 +459,30 @@ public class SequenceDiagram extends OldGridElement {
 		for (int i = 0; i < numObjects; i++) {
 			boolean underline = false;
 			String s = obj.elementAt(i);
-			if (s.startsWith(FormatLabels.UNDERLINE.getValue()) && s.endsWith(FormatLabels.UNDERLINE.getValue()) && s.length() > 2) {
-				underline = true;
-				s = s.substring(1, s.length() - 1);
+			if (!" ".equals(s)) {
+				if (s.startsWith(FormatLabels.UNDERLINE.getValue()) && s.endsWith(FormatLabels.UNDERLINE.getValue()) && s.length() > 2) {
+					underline = true;
+					s = s.substring(1, s.length() - 1);
+				}
+				TextLayout layout = new TextLayout(s, Main.getHandlerForElement(this).getFontHandler().getFont(),
+						g2.getFontRenderContext());
+
+				g2.drawRect(xpos, ypos, rectWidth - 1, rectHeight - 1);
+
+				int dx = (rectWidth - 2 - (int) Math.floor(layout.getBounds().getWidth() + 1)) / 2;
+				int dy = (rectHeight - 2 - (int) Math.floor(layout.getBounds().getHeight() + 1)) / 2;
+				int tx = xpos + dx;
+				int ty = ypos + dy + (int) layout.getBounds().getHeight();
+
+				layout.draw(g2, tx, ty);
+
+				if (underline) {
+					g2.drawLine(tx,
+							ty + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() / 2,
+							tx + (int) layout.getBounds().getWidth(),
+							ty + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() / 2);
+				}
 			}
-			TextLayout layout = new TextLayout(s, Main.getHandlerForElement(this).getFontHandler().getFont(),
-					g2.getFontRenderContext());
-
-			g2.drawRect(xpos, ypos, rectWidth - 1, rectHeight - 1);
-
-			int dx = (rectWidth - 2 - (int) Math.floor(layout.getBounds().getWidth() + 1)) / 2;
-			int dy = (rectHeight - 2 - (int) Math.floor(layout.getBounds().getHeight() + 1)) / 2;
-			int tx = xpos + dx;
-			int ty = ypos + dy + (int) layout.getBounds().getHeight();
-
-			layout.draw(g2, tx, ty);
-
-			if (underline) {
-				g2.drawLine(tx,
-						ty + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() / 2,
-						tx + (int) layout.getBounds().getWidth(),
-						ty + (int) Main.getHandlerForElement(this).getFontHandler().getDistanceBetweenTexts() / 2);
-			}
-
 			xpos += rectWidth + rectDistance;
 		}
 
@@ -727,14 +728,14 @@ public class SequenceDiagram extends OldGridElement {
 					int y1 = vCenterForLevel(startLevel + offset) - levelHeight - 1;
 					Color oldColor = g2.getColor();
 					g2.setColor(Color.LIGHT_GRAY);
-					g2.fillRect(x1, y1, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
+					g2.fillRect(x1, y1 + levelHeight / 2, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
 					g2.setColor(oldColor);
-					g2.drawRect(x1, y1, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
+					g2.drawRect(x1, y1 + levelHeight / 2, controlFlowBoxWidth - 1, levelHeight * boxSize); // draw the box
 
 					g2.setStroke(Utils.getStroke(LineType.DASHED, 1)); // #draw the line between the boxes
-					g2.drawLine(lineX, lineY1, lineX, y1); // #
+					g2.drawLine(lineX, lineY1, lineX, y1 + levelHeight / 2); // #
 					g2.setStroke(Utils.getStroke(LineType.SOLID, 1)); // #
-					lineY1 = y1 + levelHeight * boxSize; // #
+					lineY1 = y1 + levelHeight / 2 + levelHeight * boxSize; // #
 					startLevel = -1;
 					boxSize = 0;
 				}
